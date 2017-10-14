@@ -76,7 +76,8 @@ sass:
 plugins:
   - jekyll-sitemap # Create a sitemap using the official Jekyll sitemap gem
   - jekyll-feed # Create an Atom feed using the official Jekyll feed gem
-
+#Google Verification
+google verify: juyJxn6w5eU_c5SwA68JCGUSorV3WKEA1Qp6q7ki-8k
 # Exclude these files from your production _site
 exclude:
   - Gemfile
