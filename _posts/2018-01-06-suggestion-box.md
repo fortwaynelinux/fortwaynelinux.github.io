@@ -2,6 +2,7 @@
 layout: post
 title: Suggestion Box
 author: Ben Landin
+excerpt_separator: ""
 ---
 
 Do you have an idea for a presentation topic? Do you have feedback about the group or our events? We want to hear from you! Fill out our suggestion box survey and let us know what's on your mind.
