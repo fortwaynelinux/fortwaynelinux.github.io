@@ -30,6 +30,7 @@ title: Event Calendar
 
 #calendar .event > i.material-icons {
 	display: block;
+	clear: both;
 	float: left;
 	margin-top: 0.5rem;
 	padding: 0.5rem 0px 0px 0.25rem;
@@ -88,50 +89,55 @@ document.addEventListener('DOMContentLoaded', function (e) {
 		'January', 'February', 'March', 'April', 'May', 'June',
 		'July', 'August', 'September', 'October', 'November', 'December'
 	],
-	fwlug = new Meetup('Fort-Wayne-Linux-Users-Group');
+	fwlug = new Meetup('Fort-Wayne-Linux-Users-Group', {
+		events: { page: 3 }
+	});
 	fwlug.events(function (events) {
 		cal.innerHTML = '';
 		events.forEach(function (event) {
-			var date = new Date(event.time + event.utc_offset),
-			daneName, dateTime, datePM = false, dateMin,
-			venueAddress;
+			if (
+				event.visibility == 'public' &&
+				event.status == 'upcoming'
+			) {
+				var date = new Date(event.time + event.utc_offset),
+				daneName, dateTime, datePM = false, dateMin,
+				venueAddress;
 
-			dateName = weekdays[date.getUTCDay()];
-			dateName += ', ' + months[date.getUTCMonth()];
-			dateName += ' ' + date.getUTCDate();
-			dateName += ', ' + date.getUTCFullYear();
+				dateName = weekdays[date.getUTCDay()];
+				dateName += ', ' + months[date.getUTCMonth()];
+				dateName += ' ' + date.getUTCDate();
+				dateName += ', ' + date.getUTCFullYear();
 
-			dateTime = date.getUTCHours();
-			if (dateTime > 12) {
-				dateTime = dateTime - 12;
-				datePM = true;
+				dateTime = date.getUTCHours();
+				if (dateTime > 12) {
+					dateTime = dateTime - 12;
+					datePM = true;
+				}
+				dateMin = date.getUTCMinutes();
+				dateTime += ':' + (dateMin < 10 ? '0' : '') + dateMin;
+				dateTime += ' ' + (datePM ? 'PM' : 'AM');
+				dateTime += ' ET';
+
+				venueAddress = event.venue.address_1;
+				['address_2', 'address_3', 'city', 'state'].forEach(function (k) {
+					if (k in event.venue)
+						venueAddress += ', ' + event.venue[k];
+				});
+
+				cal.appendChild(createCalendarEvent({
+					id: event.id,
+					name: event.name,
+					link: event.link,
+					dateString: dateName,
+					timeString: dateTime,
+					venue: {
+						name: event.venue.name,
+						fullAddress: venueAddress,
+						findUs: event.how_to_find_us
+					},
+					description: event.description
+				}));
 			}
-			dateMin = date.getUTCMinutes();
-			dateTime += ':' + (dateMin < 10 ? '0' : '') + dateMin;
-			dateTime += ' ' + (datePM ? 'PM' : 'AM');
-			dateTime += ' ET';
-
-			venueAddress = event.venue.address_1;
-			if ('address_2' in event.venue)
-				venueAddress += ', ' + event.venue.address_2;
-			if ('address_3' in event.venue)
-				venueAddress += ', ' + event.venue.address_3;
-			venueAddress += ', ' + event.venue.city;
-			venueAddress += ', ' + event.venue.state;
-
-			cal.appendChild(createCalendarEvent({
-				id: event.id,
-				name: event.name,
-				link: event.link,
-				dateString: dateName,
-				timeString: dateTime,
-				venue: {
-					name: event.venue.name,
-					fullAddress: venueAddress,
-					findUs: event.how_to_find_us
-				},
-				description: event.description
-			}));
 		});
 	});
 });
@@ -162,6 +168,17 @@ var util = {
 		if (children) children.forEach(function (child) { el.appendChild(child); });
 		return el;
 	},
+	icon: function (name, classes = null) {
+		var el = util.el('i', {
+			className: 'material-icons',
+			innerHTML: name
+		});
+		if (typeof classes == 'string')
+			classes = classes.split(' ');
+		if (classes !== null && classes.constructor === Array)
+			classes.forEach(function (cln) { el.classList.toggle(cln, true) });
+		return el;
+	},
 	text: function (text) { return document.createTextNode(text); }
 },
 createCalendarEvent = function (event) {
@@ -177,19 +194,11 @@ createCalendarEvent = function (event) {
 					util.text(event.name + ' '),
 					util.el('a', {
 						href: event.link,
-						children: [
-							util.el('i', {
-								className: 'material-icons',
-								innerHTML: 'link'
-							})
-						]
+						children: [ util.icon('link') ]
 					})
 				]
 			}),
-			util.el('i', {
-				className: 'event-datetime-icon material-icons',
-				innerHTML: 'access_time'
-			}),
+			util.icon('access_time', 'event-datetime-icon'),
 			util.el('div', {
 				children: [
 					util.el('div', {
@@ -202,10 +211,7 @@ createCalendarEvent = function (event) {
 					})
 				]
 			}),
-			util.el('i', {
-				className: 'event-venue-icon material-icons',
-				innerHTML: 'location_on'
-			}),
+			util.icon('location_on', 'event-venue-icon'),
 			util.el('div', {
 				children: [
 					util.el('div', {
@@ -219,12 +225,7 @@ createCalendarEvent = function (event) {
 							util.el('a', {
 								href: 'https://maps.google.com/maps?q=' + encodeURIComponent(event.venue.fullAddress),
 								target: '_blank',
-								children: [
-									util.el('i', {
-										className: 'material-icons',
-										innerHTML: 'link'
-									})
-								]
+								children: [ util.icon('link') ]
 							})
 						]
 					}),
@@ -292,16 +293,36 @@ AjaxRequest = function (userConfig) {
 	xhr.setRequestHeader('Content-Type', config.contentType + ';charset=UTF-8');
 	xhr.send((GET ? null : encData));
 },
-Meetup = function (urlName) {
-	var api = 'http://meetupapi.fortwaynelinux.org/';
+Meetup = function (urlName, userConfig = null) {
+	var api = 'http://meetupapi.fortwaynelinux.org/',
+	errorHandler = function (load, xhr, e) { if (!load) {
+		console.error('Unable to contact Meetup API.');
+	}},
+	config = {
+		events: { page: 200 },
+		event: {}
+	};
+	Object.keys(config).forEach(function (req) {
+		if (userConfig !== null && req in userConfig) Object.assign(config[req], userConfig[req]);
+	});
 	return {
-		events: function (callback, limit = 200) {
+		events: function (callback, data = null) {
 			new AjaxRequest({
 				url: api + urlName + '/events',
-				data: { page: limit },
+				data: Object.assign(config.events, data),
 				responseType: 'json',
-				load: callback
+				load: callback,
+				handler: errorHandler
 			});
+		},
+		event: function (id, callback, data = null) {
+			new AjaxRequest({
+				url: api + urlName + '/event/' + id,
+				data: Object.assign(config.event, data),
+				responseType: 'json',
+				load: callback,
+				handler: errorHandler
+			})
 		}
 	};
 };
