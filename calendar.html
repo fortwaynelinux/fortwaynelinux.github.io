@@ -1,0 +1,330 @@
+---
+layout: default
+title: Event Calendar
+---
+
+<h1>Upcoming Events</h1>
+<div id="calendar"><noscript>JavaScript is required to view the event calendar.</noscript></div>
+
+<style>
+#calendar .event {
+	margin: 1rem 0px;
+	padding: 1rem;
+	border-radius: 1rem;
+	border-width: 1px 1px 2px;
+	border-style: solid;
+	border-color: #EEEEEE #EEEEEE #000000;
+	background: linear-gradient(#F7F7F7, #EEEEEE);
+}
+
+#calendar .event div:empty {
+	display: none;
+}
+
+#calendar .event .event-name {
+	display: block;
+	clear: both;
+	font-size: 1.5rem;
+	font-weight: bold;
+}
+
+#calendar .event > i.material-icons {
+	display: block;
+	clear: both;
+	float: left;
+	margin-top: 0.5rem;
+	padding: 0.5rem 0px 0px 0.25rem;
+	width: 3.5rem;
+	height: 3.5rem;
+	font-size: 2.5rem;
+}
+#calendar .event > i.material-icons + * {
+	clear: right;
+}
+#calendar .event > i.material-icons + * > * {
+	margin-left: 3.5rem;
+}
+
+#calendar .event .event-date {
+	margin-top: 0.5rem;
+	font-size: 1.25rem;
+	font-weight: bold;
+}
+
+#calendar .event .event-time {
+	font-size: 1.25rem;
+}
+
+#calendar .event .event-venue-name {
+	margin-top: 0.5rem;
+	font-size: 1.25rem;
+	font-weight: bold;
+}
+
+#calendar .event .event-venue-address {
+	font-size: 1.25rem;
+}
+
+#calendar .event .event-find-us {
+	margin-top: 0.5rem;
+	font-style: italic;
+}
+
+#calendar .event .event-description {
+	margin-top: 0.5rem;
+}
+
+#calendar .event .event-description p:last-child {
+	margin-bottom: 0px;
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function (e) {
+	var cal = util.byId('calendar');
+	cal.innerHTML = 'Loading event calendar...';
+	var weekdays = [
+		'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+	],
+	months = [
+		'January', 'February', 'March', 'April', 'May', 'June',
+		'July', 'August', 'September', 'October', 'November', 'December'
+	],
+	fwlug = new Meetup('Fort-Wayne-Linux-Users-Group', {
+		events: { page: 3 }
+	});
+	fwlug.events(function (events) {
+		cal.innerHTML = '';
+		events.forEach(function (event) {
+			if (
+				event.visibility == 'public' &&
+				event.status == 'upcoming'
+			) {
+				var date = new Date(event.time + event.utc_offset),
+				daneName, dateTime, datePM = false, dateMin,
+				venueAddress;
+
+				dateName = weekdays[date.getUTCDay()];
+				dateName += ', ' + months[date.getUTCMonth()];
+				dateName += ' ' + date.getUTCDate();
+				dateName += ', ' + date.getUTCFullYear();
+
+				dateTime = date.getUTCHours();
+				if (dateTime > 12) {
+					dateTime = dateTime - 12;
+					datePM = true;
+				}
+				dateMin = date.getUTCMinutes();
+				dateTime += ':' + (dateMin < 10 ? '0' : '') + dateMin;
+				dateTime += ' ' + (datePM ? 'PM' : 'AM');
+				dateTime += ' ET';
+
+				venueAddress = event.venue.address_1;
+				['address_2', 'address_3', 'city', 'state'].forEach(function (k) {
+					if (k in event.venue)
+						venueAddress += ', ' + event.venue[k];
+				});
+
+				cal.appendChild(createCalendarEvent({
+					id: event.id,
+					name: event.name,
+					link: event.link,
+					dateString: dateName,
+					timeString: dateTime,
+					venue: {
+						name: event.venue.name,
+						fullAddress: venueAddress,
+						findUs: event.how_to_find_us
+					},
+					description: event.description
+				}));
+			}
+		});
+	});
+});
+
+var util = {
+	forEach: function (obj, fn) { Object.keys(obj).forEach(function (key, idx) { fn(key, obj[key], idx, obj); }); },
+	byId: function (elid) { return document.getElementById(elid); },
+	setAttrs: function (el, attrs) {
+		util.forEach(attrs, function (key, val) { el.setAttribute(key, val); });
+	},
+	el: function (tag, props = null) {
+		var el = document.createElement(tag),
+		attrs = null, children = null;
+		if ('attributes' in props) {
+			attrs = props.attributes;
+			delete props.attributes;
+		}
+		if ('children' in props) {
+			children = props.children;
+			delete props.children;
+		}
+		if ('style' in props) {
+			Object.assign(el.style, props.style);
+			delete props.style;
+		}
+		Object.assign(el, props);
+		if (attrs) util.setAttrs(el, attrs);
+		if (children) children.forEach(function (child) { el.appendChild(child); });
+		return el;
+	},
+	icon: function (name, classes = null) {
+		var el = util.el('i', {
+			className: 'material-icons',
+			innerHTML: name
+		});
+		if (typeof classes == 'string')
+			classes = classes.split(' ');
+		if (classes !== null && classes.constructor === Array)
+			classes.forEach(function (cln) { el.classList.toggle(cln, true) });
+		return el;
+	},
+	text: function (text) { return document.createTextNode(text); }
+},
+createCalendarEvent = function (event) {
+	if (!('findUs' in event.venue)) event.venue.findUs = '';
+	if (!('description' in event)) event.description = '';
+	return util.el('div', {
+		className: 'event',
+		id: 'event-' + event.id,
+		children: [
+			util.el('div', {
+				className: 'event-name',
+				children: [
+					util.text(event.name + ' '),
+					util.el('a', {
+						href: event.link,
+						children: [ util.icon('link') ]
+					})
+				]
+			}),
+			util.icon('access_time', 'event-datetime-icon'),
+			util.el('div', {
+				children: [
+					util.el('div', {
+						className: 'event-date',
+						innerHTML: event.dateString
+					}),
+					util.el('div', {
+						className: 'event-time',
+						innerHTML: event.timeString
+					})
+				]
+			}),
+			util.icon('location_on', 'event-venue-icon'),
+			util.el('div', {
+				children: [
+					util.el('div', {
+						className: 'event-venue-name',
+						innerHTML: event.venue.name
+					}),
+					util.el('div', {
+						className: 'event-venue-address',
+						children: [
+							util.text(event.venue.fullAddress + ' '),
+							util.el('a', {
+								href: 'https://maps.google.com/maps?q=' + encodeURIComponent(event.venue.fullAddress),
+								target: '_blank',
+								children: [ util.icon('link') ]
+							})
+						]
+					}),
+					util.el('div', {
+						className: 'event-find-us',
+						innerHTML: event.venue.findUs
+					})
+				]
+			}),
+			util.el('div', {
+				className: 'event-description',
+				innerHTML: event.description
+			})
+		]
+	});
+},
+AjaxException = function (msg) {
+	this.name = 'AjaxException';
+	this.message = msg;
+},
+AjaxRequest = function (userConfig) {
+	if (!('url' in userConfig))
+		throw new AjaxException('URL must be provided');
+
+	var events = ['load', 'abort', 'error', 'timeout'],
+	config = Object.assign({
+		method: 'GET',
+		data: '',
+		contentType: 'application/x-www-form-urlencoded',
+		handler: function () {}
+	}, userConfig);
+
+	events.concat('handler').forEach(function (ev) {
+		if (ev in config && typeof config[ev] != 'function')
+			throw new AjaxException('Event handler must be a function');
+	});
+
+	var GET = /^get$/i.test(config.method),
+	encData = (function (data) {
+		if (typeof data == 'string') return data;
+		if (typeof data != 'object')
+			throw new AjaxException('Data must be provided as a pre-encoded string or an object');
+		var ret = '';
+		Object.keys(data).forEach(function (key, idx) {
+			ret += ((idx > 0) ? '&' : '') + key + '=' + encodeURIComponent(data[key]);
+		});
+		return ret;
+	}(config.data));
+
+	var xhr = new XMLHttpRequest(),
+	xhrEventHandler = function (e) {
+		var load = (e.type == 'load');
+		if (e.type in config)
+			config[e.type].call(config, (load ? e.target.response : e), e.target);
+		config.handler.call(config, load, e.target, (load ? e.target.response : e));
+	};
+	events.forEach(function (eventname) {
+		xhr.addEventListener(eventname, xhrEventHandler);
+	});
+
+	if (GET) config.url += '?' + encData;
+
+	xhr.open(config.method, config.url);
+	['responseType', 'timeout'].forEach(function (prop) { if (prop in config) xhr[prop] = config[prop]; });
+	xhr.setRequestHeader('Content-Type', config.contentType + ';charset=UTF-8');
+	xhr.send((GET ? null : encData));
+},
+Meetup = function (urlName, userConfig = null) {
+	var api = 'http://meetupapi.fortwaynelinux.org/',
+	errorHandler = function (load, xhr, e) { if (!load) {
+		console.error('Unable to contact Meetup API.');
+	}},
+	config = {
+		events: { page: 200 },
+		event: {}
+	};
+	Object.keys(config).forEach(function (req) {
+		if (userConfig !== null && req in userConfig) Object.assign(config[req], userConfig[req]);
+	});
+	return {
+		events: function (callback, data = null) {
+			new AjaxRequest({
+				url: api + urlName + '/events',
+				data: Object.assign(config.events, data),
+				responseType: 'json',
+				load: callback,
+				handler: errorHandler
+			});
+		},
+		event: function (id, callback, data = null) {
+			new AjaxRequest({
+				url: api + urlName + '/event/' + id,
+				data: Object.assign(config.event, data),
+				responseType: 'json',
+				load: callback,
+				handler: errorHandler
+			})
+		}
+	};
+};
+</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
