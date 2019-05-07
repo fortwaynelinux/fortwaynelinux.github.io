@@ -17,7 +17,7 @@ Beginning May 5, Fort Wayne Linux Users Group will begin charging a small yearly
 
 **What is my alternative to learn about upcoming Fort Wayne LUG events?**
 
-We are excited to announce our participation on GetTogether ([](https://gettogether.community)), a free online community for event sharing whose code is open-source. Please join our "team" on GetTogether at [](https://gettogether.community/fort-wayne-linux-users-group/). There you will find information about all our latest events, totally for free. Even better, you can inspect the code that powers GetTogether and help contribute improvements. Check out this link if you would like to help: [](https://github.com/GetTogetherComm/GetTogether)
+We are excited to announce our participation on GetTogether ([gettogether.community](https://gettogether.community)), a free online community for event sharing whose code is open-source. Please join our "team" on GetTogether at [gettogether.community/fort-wayne-linux-users-group](https://gettogether.community/fort-wayne-linux-users-group/). There you will find information about all our latest events, totally for free. Even better, you can inspect the code that powers GetTogether and help contribute improvements. Check out this link if you would like to help: [github.com/GetTogetherComm/GetTogether](https://github.com/GetTogetherComm/GetTogether)
 
 **What will you do with the money you save?**
 

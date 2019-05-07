@@ -51,7 +51,3 @@ nav {
 		}
 	}
 }
-
-a:empty::before {
-	content: attr(href);
-}
