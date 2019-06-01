@@ -95,61 +95,30 @@ window.addEventListener('load', function (e) {
 	fwlug.events(function (events) {
 		cal.innerHTML = '';
 		events.forEach(function (event) {
-			if (
-				event.visibility == 'public' &&
-				event.status == 'upcoming'
-			) {
-				if ('startDate' in event && !('local_date' in event && 'local_time' in event)) {
-					var etDate = new Date(new Date(event.startDate).toLocaleString('en-US', { timeZone: 'America/Indiana/Indianapolis' }));
-					event.local_date = [etDate.getFullYear(), etDate.getMonth(), etDate.getDate()].join('-');
-					event.local_time = [etDate.getHours(), etDate.getMinutes(), etDate.getSeconds()].join(':');
-				}
+			if (!('startDate' in event))
+				return console.error('Unable to create event without a date and time');
 
-				if ('time' in event && 'utc_offset' in event)
-					var date = new Date(event.time + event.utc_offset);
-				else if ('local_date' in event && 'local_time' in event)
-					var date = new Date(event.local_date + 'T' + event.local_time);
-				else
-					return console.error('Unable to create event without a date and time');
+			venueAddress = event.venue.address_1;
+			['address_2', 'address_3', 'city', 'state'].forEach(function (k) {
+				if (k in event.venue)
+					venueAddress += ', ' + event.venue[k];
+			});
 
-				var dateName, dateTime, datePM = false, dateMin,
-				venueAddress;
+			var date = moment.utc(event.startDate.toString()).tz('America/Indiana/Indianapolis');
 
-				dateName = weekdays[date.getUTCDay()];
-				dateName += ', ' + months[date.getUTCMonth()];
-				dateName += ' ' + date.getUTCDate();
-				dateName += ', ' + date.getUTCFullYear();
-
-				dateTime = date.getUTCHours();
-				if (dateTime > 12) {
-					dateTime = dateTime - 12;
-					datePM = true;
-				}
-				dateMin = date.getUTCMinutes();
-				dateTime += ':' + (dateMin < 10 ? '0' : '') + dateMin;
-				dateTime += ' ' + (datePM ? 'PM' : 'AM');
-				dateTime += ' ET';
-
-				venueAddress = event.venue.address_1;
-				['address_2', 'address_3', 'city', 'state'].forEach(function (k) {
-					if (k in event.venue)
-						venueAddress += ', ' + event.venue[k];
-				});
-
-				cal.appendChild(createCalendarEvent({
-					id: event.id,
-					name: event.name,
-					link: event.link,
-					dateString: dateName,
-					timeString: dateTime,
-					venue: {
-						name: event.venue.name,
-						fullAddress: venueAddress,
-						findUs: event.how_to_find_us || ''
-					},
-					description: event.description
-				}));
-			}
+			cal.appendChild(createCalendarEvent({
+				id: event.id,
+				name: event.name,
+				link: event.link,
+				dateString: date.format('dddd, MMMM Do, YYYY'),
+				timeString: date.format('h:mm A'),
+				venue: {
+					name: event.venue.name,
+					fullAddress: venueAddress,
+					findUs: event.how_to_find_us || ''
+				},
+				description: event.description
+			}));
 		});
 	});
 });
@@ -310,39 +279,6 @@ AjaxRequest = function (userConfig) {
 	xhr.setRequestHeader('Content-Type', config.contentType + ';charset=UTF-8');
 	xhr.send((GET ? null : encData));
 },
-Meetup = function (urlName, userConfig = null) {
-	var api = 'http://meetupapi.fortwaynelinux.org/',
-	errorHandler = function (load, xhr, e) { if (!load) {
-		console.error('Unable to contact Meetup API.');
-	}},
-	config = {
-		events: { page: 200 },
-		event: {}
-	};
-	Object.keys(config).forEach(function (req) {
-		if (userConfig !== null && req in userConfig) Object.assign(config[req], userConfig[req]);
-	});
-	return {
-		events: function (callback, data = null) {
-			new AjaxRequest({
-				url: api + urlName + '/events',
-				data: Object.assign(config.events, data),
-				responseType: 'json',
-				load: callback,
-				handler: errorHandler
-			});
-		},
-		event: function (id, callback, data = null) {
-			new AjaxRequest({
-				url: api + urlName + '/event/' + id,
-				data: Object.assign(config.event, data),
-				responseType: 'json',
-				load: callback,
-				handler: errorHandler
-			})
-		}
-	};
-},
 GetTogether = function (urlName, teamNum) {
 	var instanceUrl = 'http://gtproxy.fortwaynelinux.org/',
 	errorHandler = function (load, xhr, e) { if (!load) {
@@ -359,8 +295,6 @@ GetTogether = function (urlName, teamNum) {
 					var icsEvents = vevents.map(function (vevent) { return new ICAL.Event(vevent); });
 					var events = vevents.map(function (vevent) {
 						return {
-							visibility: 'public',
-							status: 'upcoming',
 							id: vevent.getFirstPropertyValue('uid'),
 							name: vevent.getFirstPropertyValue('summary'),
 							link: vevent.getFirstPropertyValue('url'),
@@ -382,4 +316,6 @@ GetTogether = function (urlName, teamNum) {
 };
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-<script src="/ical.js"></script>
+<script src="/ical.min.js"></script>
+<script src="/moment.min.js"></script>
+<script src="/moment-timezone-with-data-10-year-range.min.js"></script>
