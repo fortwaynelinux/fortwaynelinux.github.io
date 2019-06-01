@@ -80,18 +80,18 @@ title: Event Calendar
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function (e) {
-	var cal = util.byId('calendar');
-	cal.innerHTML = 'Loading event calendar...';
-	var weekdays = [
+	util.byId('calendar').innerHTML = 'Loading event calendar...';
+});
+window.addEventListener('load', function (e) {
+	var cal = util.byId('calendar'),
+	weekdays = [
 		'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 	],
 	months = [
 		'January', 'February', 'March', 'April', 'May', 'June',
 		'July', 'August', 'September', 'October', 'November', 'December'
 	],
-	fwlug = new Meetup('Fort-Wayne-Linux-Users-Group', {
-		events: { page: 3 }
-	});
+	fwlug = new GetTogether('Fort-Wayne-Linux-Users-Group', 812);
 	fwlug.events(function (events) {
 		cal.innerHTML = '';
 		events.forEach(function (event) {
@@ -99,8 +99,20 @@ document.addEventListener('DOMContentLoaded', function (e) {
 				event.visibility == 'public' &&
 				event.status == 'upcoming'
 			) {
-				var date = new Date(event.time + event.utc_offset),
-				daneName, dateTime, datePM = false, dateMin,
+				if ('startDate' in event && !('local_date' in event && 'local_time' in event)) {
+					var etDate = new Date(new Date(event.startDate).toLocaleString('en-US', { timeZone: 'America/Indiana/Indianapolis' }));
+					event.local_date = [etDate.getFullYear(), etDate.getMonth(), etDate.getDate()].join('-');
+					event.local_time = [etDate.getHours(), etDate.getMinutes(), etDate.getSeconds()].join(':');
+				}
+
+				if ('time' in event && 'utc_offset' in event)
+					var date = new Date(event.time + event.utc_offset);
+				else if ('local_date' in event && 'local_time' in event)
+					var date = new Date(event.local_date + 'T' + event.local_time);
+				else
+					return console.error('Unable to create event without a date and time');
+
+				var dateName, dateTime, datePM = false, dateMin,
 				venueAddress;
 
 				dateName = weekdays[date.getUTCDay()];
@@ -133,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function (e) {
 					venue: {
 						name: event.venue.name,
 						fullAddress: venueAddress,
-						findUs: event.how_to_find_us
+						findUs: event.how_to_find_us || ''
 					},
 					description: event.description
 				}));
@@ -220,14 +232,19 @@ createCalendarEvent = function (event) {
 					}),
 					util.el('div', {
 						className: 'event-venue-address',
-						children: [
-							util.text(event.venue.fullAddress + ' '),
-							util.el('a', {
-								href: 'https://maps.google.com/maps?q=' + encodeURIComponent(event.venue.fullAddress),
-								target: '_blank',
-								children: [ util.icon('link') ]
-							})
-						]
+						children: (
+							event.venue.fullAddress.indexOf('ADDRESS_ON_EVENT_PAGE') == -1 ? [
+								util.text(event.venue.fullAddress + ' '),
+								util.el('a', {
+									href: 'https://maps.google.com/maps?q=' + encodeURIComponent(event.venue.fullAddress),
+									target: '_blank',
+									children: [ util.icon('link') ]
+								})
+							]
+							: [util.el('i', {
+								children: [util.text('Address available on event page')]
+							})]
+						)
 					}),
 					util.el('div', {
 						className: 'event-find-us',
@@ -325,6 +342,44 @@ Meetup = function (urlName, userConfig = null) {
 			})
 		}
 	};
+},
+GetTogether = function (urlName, teamNum) {
+	var instanceUrl = 'http://gtproxy.fortwaynelinux.org/',
+	errorHandler = function (load, xhr, e) { if (!load) {
+		console.error('Unable to contact GetTogether instance.');
+	}};
+	return {
+		events: function (callback, data = null) {
+			new AjaxRequest({
+				url: instanceUrl + 'team/' + teamNum + '/events.ics',
+				load: function (res) {
+					var jcalData = ICAL.parse(res);
+					var comp = new ICAL.Component(jcalData);
+					var vevents = comp.getAllSubcomponents('vevent'), events = [];
+					var icsEvents = vevents.map(function (vevent) { return new ICAL.Event(vevent); });
+					var events = vevents.map(function (vevent) {
+						return {
+							visibility: 'public',
+							status: 'upcoming',
+							id: vevent.getFirstPropertyValue('uid'),
+							name: vevent.getFirstPropertyValue('summary'),
+							link: vevent.getFirstPropertyValue('url'),
+							startDate: vevent.getFirstPropertyValue('dtstart').toString(),
+							description: vevent.getFirstPropertyValue('description'),
+							venue: {
+								name: vevent.getFirstPropertyValue('location'),
+								address_1: 'ADDRESS_ON_EVENT_PAGE'
+							}
+						};
+					});
+
+					callback.apply(null, [events]);
+				},
+				handler: errorHandler
+			});
+		}
+	};
 };
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+<script src="/ical.js"></script>
