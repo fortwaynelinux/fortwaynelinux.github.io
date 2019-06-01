@@ -80,64 +80,38 @@ title: Event Calendar
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function (e) {
-	var cal = util.byId('calendar');
-	cal.innerHTML = 'Loading event calendar...';
-	var weekdays = [
-		'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
-	],
-	months = [
-		'January', 'February', 'March', 'April', 'May', 'June',
-		'July', 'August', 'September', 'October', 'November', 'December'
-	],
-	fwlug = new Meetup('Fort-Wayne-Linux-Users-Group', {
-		events: { page: 3 }
-	});
+	util.byId('calendar').innerHTML = 'Loading event calendar...';
+});
+window.addEventListener('load', function (e) {
+	var cal = util.byId('calendar'),
+	fwlug = new GetTogether('Fort-Wayne-Linux-Users-Group', 812);
 	fwlug.events(function (events) {
 		cal.innerHTML = '';
 		events.forEach(function (event) {
-			if (
-				event.visibility == 'public' &&
-				event.status == 'upcoming'
-			) {
-				var date = new Date(event.time + event.utc_offset),
-				daneName, dateTime, datePM = false, dateMin,
-				venueAddress;
+			if (!('startDate' in event))
+				return console.error('Unable to create event without a date and time');
 
-				dateName = weekdays[date.getUTCDay()];
-				dateName += ', ' + months[date.getUTCMonth()];
-				dateName += ' ' + date.getUTCDate();
-				dateName += ', ' + date.getUTCFullYear();
+			venueAddress = event.venue.address_1;
+			['address_2', 'address_3', 'city', 'state'].forEach(function (k) {
+				if (k in event.venue)
+					venueAddress += ', ' + event.venue[k];
+			});
 
-				dateTime = date.getUTCHours();
-				if (dateTime > 12) {
-					dateTime = dateTime - 12;
-					datePM = true;
-				}
-				dateMin = date.getUTCMinutes();
-				dateTime += ':' + (dateMin < 10 ? '0' : '') + dateMin;
-				dateTime += ' ' + (datePM ? 'PM' : 'AM');
-				dateTime += ' ET';
+			var date = moment.utc(event.startDate.toString()).tz('America/Indiana/Indianapolis');
 
-				venueAddress = event.venue.address_1;
-				['address_2', 'address_3', 'city', 'state'].forEach(function (k) {
-					if (k in event.venue)
-						venueAddress += ', ' + event.venue[k];
-				});
-
-				cal.appendChild(createCalendarEvent({
-					id: event.id,
-					name: event.name,
-					link: event.link,
-					dateString: dateName,
-					timeString: dateTime,
-					venue: {
-						name: event.venue.name,
-						fullAddress: venueAddress,
-						findUs: event.how_to_find_us
-					},
-					description: event.description
-				}));
-			}
+			cal.appendChild(createCalendarEvent({
+				id: event.id,
+				name: event.name,
+				link: event.link,
+				dateString: date.format('dddd, MMMM Do, YYYY'),
+				timeString: date.format('h:mm A'),
+				venue: {
+					name: event.venue.name,
+					fullAddress: venueAddress,
+					findUs: event.how_to_find_us || ''
+				},
+				description: event.description
+			}));
 		});
 	});
 });
@@ -220,14 +194,19 @@ createCalendarEvent = function (event) {
 					}),
 					util.el('div', {
 						className: 'event-venue-address',
-						children: [
-							util.text(event.venue.fullAddress + ' '),
-							util.el('a', {
-								href: 'https://maps.google.com/maps?q=' + encodeURIComponent(event.venue.fullAddress),
-								target: '_blank',
-								children: [ util.icon('link') ]
-							})
-						]
+						children: (
+							event.venue.fullAddress.indexOf('ADDRESS_ON_EVENT_PAGE') == -1 ? [
+								util.text(event.venue.fullAddress + ' '),
+								util.el('a', {
+									href: 'https://maps.google.com/maps?q=' + encodeURIComponent(event.venue.fullAddress),
+									target: '_blank',
+									children: [ util.icon('link') ]
+								})
+							]
+							: [util.el('i', {
+								children: [util.text('Address available on event page')]
+							})]
+						)
 					}),
 					util.el('div', {
 						className: 'event-find-us',
@@ -293,38 +272,43 @@ AjaxRequest = function (userConfig) {
 	xhr.setRequestHeader('Content-Type', config.contentType + ';charset=UTF-8');
 	xhr.send((GET ? null : encData));
 },
-Meetup = function (urlName, userConfig = null) {
-	var api = 'http://meetupapi.fortwaynelinux.org/',
+GetTogether = function (urlName, teamNum) {
+	var instanceUrl = 'http://gtproxy.fortwaynelinux.org/',
 	errorHandler = function (load, xhr, e) { if (!load) {
-		console.error('Unable to contact Meetup API.');
-	}},
-	config = {
-		events: { page: 200 },
-		event: {}
-	};
-	Object.keys(config).forEach(function (req) {
-		if (userConfig !== null && req in userConfig) Object.assign(config[req], userConfig[req]);
-	});
+		console.error('Unable to contact GetTogether instance.');
+	}};
 	return {
 		events: function (callback, data = null) {
 			new AjaxRequest({
-				url: api + urlName + '/events',
-				data: Object.assign(config.events, data),
-				responseType: 'json',
-				load: callback,
+				url: instanceUrl + 'team/' + teamNum + '/events.ics',
+				load: function (res) {
+					var jcalData = ICAL.parse(res);
+					var comp = new ICAL.Component(jcalData);
+					var vevents = comp.getAllSubcomponents('vevent'), events = [];
+					var icsEvents = vevents.map(function (vevent) { return new ICAL.Event(vevent); });
+					var events = vevents.map(function (vevent) {
+						return {
+							id: vevent.getFirstPropertyValue('uid'),
+							name: vevent.getFirstPropertyValue('summary'),
+							link: vevent.getFirstPropertyValue('url'),
+							startDate: vevent.getFirstPropertyValue('dtstart').toString(),
+							description: vevent.getFirstPropertyValue('description'),
+							venue: {
+								name: vevent.getFirstPropertyValue('location'),
+								address_1: 'ADDRESS_ON_EVENT_PAGE'
+							}
+						};
+					});
+
+					callback.apply(null, [events]);
+				},
 				handler: errorHandler
 			});
-		},
-		event: function (id, callback, data = null) {
-			new AjaxRequest({
-				url: api + urlName + '/event/' + id,
-				data: Object.assign(config.event, data),
-				responseType: 'json',
-				load: callback,
-				handler: errorHandler
-			})
 		}
 	};
 };
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+<script src="/ical.min.js"></script>
+<script src="/moment.min.js"></script>
+<script src="/moment-timezone-with-data-10-year-range.min.js"></script>
