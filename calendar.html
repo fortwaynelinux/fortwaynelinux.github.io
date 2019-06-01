@@ -84,13 +84,6 @@ document.addEventListener('DOMContentLoaded', function (e) {
 });
 window.addEventListener('load', function (e) {
 	var cal = util.byId('calendar'),
-	weekdays = [
-		'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
-	],
-	months = [
-		'January', 'February', 'March', 'April', 'May', 'June',
-		'July', 'August', 'September', 'October', 'November', 'December'
-	],
 	fwlug = new GetTogether('Fort-Wayne-Linux-Users-Group', 812);
 	fwlug.events(function (events) {
 		cal.innerHTML = '';
