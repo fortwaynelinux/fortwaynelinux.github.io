@@ -31,7 +31,7 @@ footer-links:
   youtube: # channel/<your_long_string> or user/<user-name>
   googleplus: # anything in your profile username that comes after plus.google.com/
   gettogether: fort-wayne-linux-users-group/ # for the main page of your GetTogether team, everything after gettogether.community/
-  meetup: Fort-Wayne-Linux-Users-Group/ # for the main page of your Meetup group, everything after meetup.com/
+  meetup: #Fort-Wayne-Linux-Users-Group/ # for the main page of your Meetup group, everything after meetup.com/
 
 
 # Enter your Disqus shortname (not your username) to enable commenting on posts
