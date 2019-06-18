@@ -7,7 +7,8 @@ title: Event Calendar
 <div id="calendar"><noscript>JavaScript is required to view the event calendar.</noscript></div>
 
 <style>
-#calendar .event {
+#calendar .event,
+#calendar[data-fail-reason] {
 	margin: 1rem 0px;
 	padding: 1rem;
 	border-radius: 1rem;
@@ -84,9 +85,18 @@ document.addEventListener('DOMContentLoaded', function (e) {
 });
 window.addEventListener('load', function (e) {
 	var cal = util.byId('calendar'),
-	fwlug = new GetTogether('Fort-Wayne-Linux-Users-Group', 812);
-	fwlug.events(function (events) {
+	fwlug = new GetTogether('fort-wayne-linux-users-group', 812);
+	fwlug.events(function (events, failReason = null, failMessages = null) {
 		cal.innerHTML = '';
+
+		if (events === false) {
+			cal.dataset.failReason = failReason;
+			failMessages.forEach(function (msg) {
+				cal.appendChild(util.el('p', { children: [ msg ] }));
+			});
+			return;
+		}
+
 		events.forEach(function (event) {
 			if (!('startDate' in event))
 				return console.error('Unable to create event without a date and time');
@@ -104,7 +114,7 @@ window.addEventListener('load', function (e) {
 				name: event.name,
 				link: event.link,
 				dateString: date.format('dddd, MMMM Do, YYYY'),
-				timeString: date.format('h:mm A'),
+				timeString: date.format('h:mm A') + ' ET',
 				venue: {
 					name: event.venue.name,
 					fullAddress: venueAddress,
@@ -168,6 +178,7 @@ createCalendarEvent = function (event) {
 					util.text(event.name + ' '),
 					util.el('a', {
 						href: event.link,
+						target: '_blank',
 						children: [ util.icon('link') ]
 					})
 				]
@@ -203,9 +214,7 @@ createCalendarEvent = function (event) {
 									children: [ util.icon('link') ]
 								})
 							]
-							: [util.el('i', {
-								children: [util.text('Address available on event page')]
-							})]
+							: [util.el('i', { children: [ util.text('Address available on event page') ] })]
 						)
 					}),
 					util.el('div', {
@@ -274,33 +283,44 @@ AjaxRequest = function (userConfig) {
 },
 GetTogether = function (urlName, teamNum) {
 	var instanceUrl = 'http://gtproxy.fortwaynelinux.org/',
+	linkUrl = 'http://gettogether.community/' + urlName,
 	errorHandler = function (load, xhr, e) { if (!load) {
 		console.error('Unable to contact GetTogether instance.');
 	}};
 	return {
-		events: function (callback, data = null) {
+		events: function (callback) {
 			new AjaxRequest({
 				url: instanceUrl + 'team/' + teamNum + '/events.ics',
 				load: function (res) {
 					var jcalData = ICAL.parse(res);
 					var comp = new ICAL.Component(jcalData);
-					var vevents = comp.getAllSubcomponents('vevent'), events = [];
-					var icsEvents = vevents.map(function (vevent) { return new ICAL.Event(vevent); });
-					var events = vevents.map(function (vevent) {
-						return {
-							id: vevent.getFirstPropertyValue('uid'),
-							name: vevent.getFirstPropertyValue('summary'),
-							link: vevent.getFirstPropertyValue('url'),
-							startDate: vevent.getFirstPropertyValue('dtstart').toString(),
-							description: vevent.getFirstPropertyValue('description'),
-							venue: {
-								name: vevent.getFirstPropertyValue('location'),
-								address_1: 'ADDRESS_ON_EVENT_PAGE'
-							}
-						};
-					});
+					var vevents = comp.getAllSubcomponents('vevent');
 
-					callback.apply(null, [events]);
+					if (vevents.length < 1)
+						var cbParams = [
+							false,
+							'NO_EVENTS',
+							[
+								util.text('GetTogether did not return any events. You can visit the team page here:'),
+								util.el('a', { href: linkUrl, target: '_blank', children: [ util.text(linkUrl) ] })
+							]
+						];
+					else
+						var cbParams = [vevents.map(function (vevent) {
+							return {
+								id: vevent.getFirstPropertyValue('uid'),
+								name: vevent.getFirstPropertyValue('summary'),
+								link: vevent.getFirstPropertyValue('url'),
+								startDate: vevent.getFirstPropertyValue('dtstart').toString(),
+								description: vevent.getFirstPropertyValue('description'),
+								venue: {
+									name: vevent.getFirstPropertyValue('location'),
+									address_1: 'ADDRESS_ON_EVENT_PAGE'
+								}
+							};
+						})];
+
+					callback.apply(null, cbParams);
 				},
 				handler: errorHandler
 			});
