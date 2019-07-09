@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Subsetting the Meetup.com Group
+title: Sunsetting the Meetup.com Group
 author: Ben Landin
 ---
 
