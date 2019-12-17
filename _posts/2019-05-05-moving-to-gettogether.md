@@ -30,6 +30,5 @@ Even though we have made the decision to charge for Meetup to help defray the no
 **I don't want to pay for Meetup, but I would like to contribute to the Fort Wayne Linux Users Group directly.**
 
 - BitCoin: 354V7T5ADuiQADFQ19XPPNAsqngbGDYpfg
-- Monero: 44Ufw3Rj39VJoWYvud4HHqhqsNJ8FTsmHXVmcSbUTb4o9HLH<wbr/>42mLTaz1kdQsg1tDHReYCqZGbarg2dDYv9tH9CXgQwYQhD3
 - We will have PayPal as an available donation method soon.
 - If you wish to contribute in another manner (e.g. equipment, meeting space, etc), please email us: contact@fortwaynelinux.org
