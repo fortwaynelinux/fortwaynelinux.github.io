@@ -225,7 +225,7 @@ createCalendarEvent = function (event) {
 			}),
 			util.el('div', {
 				className: 'event-description',
-				innerHTML: event.description
+				innerHTML: event.description.replace(/\n/g,'<br/>')
 			})
 		]
 	});
