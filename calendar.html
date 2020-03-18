@@ -29,6 +29,10 @@ title: Event Calendar
 	font-weight: bold;
 }
 
+#calendar .event.canceled .event-name:after {
+	content: ' (Canceled)';
+}
+
 #calendar .event > i.material-icons {
 	display: block;
 	clear: both;
@@ -78,6 +82,38 @@ title: Event Calendar
 #calendar .event .event-description p:last-child {
 	margin-bottom: 0px;
 }
+
+#calendar .event .event-buttons {
+	margin: 1em 0px 0.5em 0px;
+}
+
+#calendar .event .event-buttons a {
+	font-size: 0.8em;
+	margin-right: 1em;
+	padding: 0.8em;
+	border: 1px solid #999999;
+	border-radius: 0.4em;
+	background: linear-gradient(#F7F7F7, #EEEEEE);
+}
+
+#calendar .event .event-buttons a:hover {
+	background: linear-gradient(#FFFFFF, #EEEEEE);
+}
+
+#calendar .event .event-buttons a span {
+	font-weight: bold;
+}
+
+#calendar .event .event-buttons a i {
+	padding-right: 0.25em;
+	vertical-align: middle;
+}
+
+#calendar .event:not(.findUs) .event-find-us,
+#calendar .event:not(.ical) .event-buttons .ical-button,
+#calendar .event.canceled .event-buttons .ical-button {
+	display: none;
+}
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function (e) {
@@ -113,6 +149,8 @@ window.addEventListener('load', function (e) {
 				id: event.id,
 				name: event.name,
 				link: event.link,
+				ical: event.ical || '',
+				canceled: event.canceled || false,
 				dateString: date.format('dddd, MMMM Do, YYYY'),
 				timeString: date.format('h:mm A') + ' ET',
 				venue: {
@@ -132,7 +170,8 @@ var util = {
 	setAttrs: function (el, attrs) {
 		util.forEach(attrs, function (key, val) { el.setAttribute(key, val); });
 	},
-	el: function (tag, props = null) {
+	isNodeList: function (els) { return els instanceof NodeList; },
+	el: function (tag, props = null, event = null, handler = null, useCapture = null) {
 		var el = document.createElement(tag),
 		attrs = null, children = null;
 		if ('attributes' in props) {
@@ -150,7 +189,19 @@ var util = {
 		Object.assign(el, props);
 		if (attrs) util.setAttrs(el, attrs);
 		if (children) children.forEach(function (child) { el.appendChild(child); });
+		if (event && handler) util.listen(el, event, handler, useCapture);
 		return el;
+	},
+	listen: function (el, ev, fn, uc = null) {
+		if (typeof el == 'string') el = util.get(el);
+		if (el.constructor === Array || util.isNodeList(el)) {
+			el.forEach(function (eln) { util.listen(eln, ev, fn, uc); });
+		} else if (ev.constructor === Array) {
+			ev.forEach(function (evn) { util.listen(el, evn, fn, uc); });
+		} else {
+			if (uc === null) el.addEventListener(ev, fn);
+			else el.addEventListener(ev, fn, uc);
+		}
 	},
 	icon: function (name, classes = null) {
 		var el = util.el('i', {
@@ -168,20 +219,15 @@ var util = {
 createCalendarEvent = function (event) {
 	if (!('findUs' in event.venue)) event.venue.findUs = '';
 	if (!('description' in event)) event.description = '';
+	if (!('ical' in event)) event.ical = '';
+	if (!('canceled' in event)) event.canceled = false;
 	return util.el('div', {
-		className: 'event',
+		className: 'event' + (event.venue.findUs != '' ? ' findUs' : '') + (event.ical != '' ? ' ical' : '') + (event.canceled ? ' canceled' : ''),
 		id: 'event-' + event.id,
 		children: [
 			util.el('div', {
 				className: 'event-name',
-				children: [
-					util.text(event.name + ' '),
-					util.el('a', {
-						href: event.link,
-						target: '_blank',
-						children: [ util.icon('link') ]
-					})
-				]
+				innerHTML: event.name
 			}),
 			util.icon('access_time', 'event-datetime-icon'),
 			util.el('div', {
@@ -226,6 +272,32 @@ createCalendarEvent = function (event) {
 			util.el('div', {
 				className: 'event-description',
 				innerHTML: event.description.replace(/\n/g,'<br/>')
+			}),
+			util.el('div', {
+				className: 'event-buttons',
+				children: [
+					util.el('a', {
+						className: 'ical-button',
+						attributes: {
+							href: event.ical,
+							target: '_blank'
+						},
+						children: [
+							util.icon('event'),
+							util.el('span', { innerHTML: 'Add to calendar' })
+						]
+					}),
+					util.el('a', {
+						attributes: {
+							href: event.link,
+							target: '_blank'
+						},
+						children: [
+							util.icon('link'),
+							util.el('span', { innerHTML: 'View event page' })
+						]
+					})
+				]
 			})
 		]
 	});
@@ -302,15 +374,16 @@ GetTogether = function (urlName, teamNum) {
 							'NO_EVENTS',
 							[
 								util.text('GetTogether did not return any events. You can visit the team page here:'),
-								util.el('a', { href: linkUrl, target: '_blank', children: [ util.text(linkUrl) ] })
+								util.el('a', { attributes: { href: linkUrl, target: '_blank' }, innerHTML: linkUrl })
 							]
 						];
 					else
 						var cbParams = [vevents.map(function (vevent) {
-							return {
+							var event = {
 								id: vevent.getFirstPropertyValue('uid'),
 								name: vevent.getFirstPropertyValue('summary'),
 								link: vevent.getFirstPropertyValue('url'),
+								ical: vevent.getFirstPropertyValue('url').replace(/\/?$/,'.ics'),
 								startDate: vevent.getFirstPropertyValue('dtstart').toString(),
 								description: vevent.getFirstPropertyValue('description'),
 								venue: {
@@ -318,6 +391,8 @@ GetTogether = function (urlName, teamNum) {
 									address_1: 'ADDRESS_ON_EVENT_PAGE'
 								}
 							};
+							event.canceled = (event.description.toLowerCase().split('\n')[0].indexOf('cancel') != -1);
+							return event;
 						}).sort(function(a, b) {
 							if (a.startDate < b.startDate)
 								return -1;
